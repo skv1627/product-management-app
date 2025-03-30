@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Product Dashboard</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <h1> Product Management Dashboard</h1>
+
+  <!--  Add Product -->
+  <div class="form-block">
+    <h2>Add Product</h2>
+    <form id="addForm">
+      <input type="text" id="name" placeholder="Name" required><br><br>
+      <textarea id="description" placeholder="Description"></textarea><br><br>
+      <input type="number" id="price" placeholder="Price" step="0.01" required><br><br>
+      <input type="number" id="quantity" placeholder="Quantity" required><br><br>
+      <input type="number" id="categoryId" placeholder="Category ID"><br><br>
+      <input type="text" id="imageUrls" placeholder="Image URLs (comma separated)"><br><br>
+      <label><input type="checkbox" id="isFeatured"> Featured</label><br>
+      <label><input type="checkbox" id="isActive" checked> Active</label><br><br>
+      <button type="submit">Add Product</button>
+      <p id="addMsg"></p>
+    </form>
+  </div>
+
+  <!--  Search and Filters -->
+  <div class="form-block">
+    <h2>Search & Filter</h2>
+    <input type="text" id="searchInput" placeholder="Search by name">
+    <button onclick="searchByName()">Search</button><br><br>
+
+    <input type="number" id="minPrice" placeholder="Min Price">
+    <input type="number" id="maxPrice" placeholder="Max Price">
+    <button onclick="filterByPrice()">Filter by Price</button><br><br>
+
+    <input type="number" id="categoryFilter" placeholder="Category ID">
+    <button onclick="filterByCategory()">Filter by Category</button>
+    <button onclick="loadAllProducts()">Reset</button>
+  </div>
+
+  <!-- Product List -->
+  <h2>All Products</h2>
+  <div id="productList"></div>
+
+  <script>
+    const baseURL = "http://localhost:8080/api/products";
+
+    // Add Product
+    document.getElementById("addForm").addEventListener("submit", function (e) {
+      e.preventDefault();
+      const newProduct = {
+        name: document.getElementById("name").value,
+        description: document.getElementById("description").value,
+        price: parseFloat(document.getElementById("price").value),
+        quantity: parseInt(document.getElementById("quantity").value),
+        isFeatured: document.getElementById("isFeatured").checked,
+        isActive: document.getElementById("isActive").checked,
+        categoryId: parseInt(document.getElementById("categoryId").value),
+        imageUrls: document.getElementById("imageUrls").value.split(',').map(s => s.trim()),
+        createdDate: new Date().toISOString()
+      };
+
+      fetch(baseURL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newProduct)
+      })
+      .then(res => res.json())
+      .then(() => {
+        document.getElementById("addMsg").textContent = "✅ Product added!";
+        document.getElementById("addForm").reset();
+        loadAllProducts();
+      });
+    });
+
+    // Load All Products
+    function loadAllProducts() {
+      fetch(baseURL)
+        .then(res => res.json())
+        .then(data => renderProducts(data));
+    }
+
+    // Search by Name
+    function searchByName() {
+      const name = document.getElementById("searchInput").value;
+      fetch(`${baseURL}/search?name=${name}`)
+        .then(res => res.json())
+        .then(data => renderProducts(data));
+    }
+
+    // Filter by Price
+    function filterByPrice() {
+      const min = document.getElementById("minPrice").value;
+      const max = document.getElementById("maxPrice").value;
+      fetch(`${baseURL}/filter?minPrice=${min}&maxPrice=${max}`)
+        .then(res => res.json())
+        .then(data => renderProducts(data));
+    }
+
+    // Filter by Category
+    function filterByCategory() {
+      const categoryId = document.getElementById("categoryFilter").value;
+      fetch(`${baseURL}/category/${categoryId}`)
+        .then(res => res.json())
+        .then(data => renderProducts(data));
+    }
+
+    // Delete
+    function deleteProduct(id) {
+      if (confirm("Delete this product?")) {
+        fetch(`${baseURL}/${id}`, { method: "DELETE" })
+          .then(() => loadAllProducts());
+      }
+    }
+
+    // Update (inline)
+    function updateProduct(id) {
+      const card = document.getElementById(`product-${id}`);
+      const inputs = card.querySelectorAll("input, textarea");
+
+      const updated = {
+        name: inputs[0].value,
+        description: inputs[1].value,
+        price: parseFloat(inputs[2].value),
+        quantity: parseInt(inputs[3].value),
+        isFeatured: inputs[4].checked,
+        isActive: inputs[5].checked,
+        categoryId: parseInt(inputs[6].value),
+        imageUrls: inputs[7].value.split(',').map(s => s.trim())
+      };
+
+      fetch(`${baseURL}/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updated)
+      })
+      .then(() => loadAllProducts());
+    }
+
+    // Render Cards
+    function renderProducts(products) {
+      const container = document.getElementById("productList");
+      container.innerHTML = "";
+      if (products.length === 0) {
+        container.innerHTML = "<p>No products found.</p>";
+        return;
+      }
+
+      products.forEach(p => {
+        container.innerHTML += `
+          <div class="card" id="product-${p.id}">
+            <input value="${p.name}"><br>
+            <textarea>${p.description}</textarea><br>
+            <input type="number" value="${p.price}"><br>
+            <input type="number" value="${p.quantity}"><br>
+            <label><input type="checkbox" ${p.isFeatured ? "checked" : ""}> Featured</label><br>
+            <label><input type="checkbox" ${p.isActive ? "checked" : ""}> Active</label><br>
+            <input type="number" value="${p.categoryId}"><br>
+            <input type="text" value="${p.imageUrls ? p.imageUrls.join(',') : ''}"><br><br>
+            <button onclick="updateProduct(${p.id})">Update</button>
+            <button onclick="deleteProduct(${p.id})">Delete</button>
+          </div>
+        `;
+      });
+    }
+
+    // Load on startup
+    window.onload = loadAllProducts;
+  </script>
+</body>
+</html>
